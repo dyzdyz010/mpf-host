@@ -48,6 +48,10 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev
 
+      - name: Install deps (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja -y
+
       - name: Download dependencies
         shell: bash
         run: |
@@ -85,12 +89,12 @@ jobs:
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: bash
         run: |
-          cmake -B build -G "MinGW Makefiles" `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" `
-            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/deps/mpf-sdk;${{ github.workspace }}/deps/mpf-http-client;${{ github.workspace }}/deps/mpf-ui-components"
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install" \
+            -DCMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/deps/mpf-sdk;$GITHUB_WORKSPACE/deps/mpf-http-client;$GITHUB_WORKSPACE/deps/mpf-ui-components"
 
       - name: Build
         run: cmake --build build
