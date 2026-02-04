@@ -42,7 +42,12 @@ jobs:
           version: ${{ env.QT_VERSION }}
           arch: ${{ matrix.arch }}
           cache: true
+          tools: ${{ runner.os == 'Windows' && 'tools_mingw1310' || '' }}
 
+      - name: Setup MinGW (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "$IQTA_TOOLS/mingw1310_64/bin" >> $GITHUB_PATH
 
       - name: Install deps (Linux)
         if: runner.os == 'Linux'
