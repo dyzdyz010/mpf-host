@@ -14,7 +14,7 @@ env:
   QT_VERSION: '6.8.3'
   SDK_VERSION: 'v1.0.2'
   HTTP_CLIENT_VERSION: 'v1.0.2'
-  UI_COMPONENTS_VERSION: 'v1.0.3'
+  UI_COMPONENTS_VERSION: 'v1.0.4'
 
 jobs:
   build:
