@@ -90,24 +90,30 @@ target_link_libraries(mpf-host PRIVATE
     MPF::foundation-sdk
 )
 
-# QML module - flatten paths (remove qml/ prefix)
-set_source_files_properties(qml/Main.qml PROPERTIES QT_RESOURCE_ALIAS Main.qml)
-set_source_files_properties(qml/SideMenu.qml PROPERTIES QT_RESOURCE_ALIAS SideMenu.qml)
-set_source_files_properties(qml/MenuItemCustom.qml PROPERTIES QT_RESOURCE_ALIAS MenuItemCustom.qml)
-set_source_files_properties(qml/ErrorDialog.qml PROPERTIES QT_RESOURCE_ALIAS ErrorDialog.qml)
-set_source_files_properties(qml/images/logo.svg PROPERTIES QT_RESOURCE_ALIAS images/logo.svg)
+# QML files - just add new files to this list
+set(HOST_QML_FILES
+    qml/Main.qml
+    qml/SideMenu.qml
+    qml/MenuItemCustom.qml
+    qml/ErrorDialog.qml
+)
+
+set(HOST_RESOURCES
+    qml/images/logo.svg
+)
+
+# Auto-flatten paths: qml/Foo.qml -> Foo.qml, qml/sub/Bar.qml -> sub/Bar.qml
+foreach(file ${HOST_QML_FILES} ${HOST_RESOURCES})
+    string(REGEX REPLACE "^qml/" "" alias "${file}")
+    set_source_files_properties(${file} PROPERTIES QT_RESOURCE_ALIAS ${alias})
+endforeach()
 
 qt_add_qml_module(mpf-host
     URI MPF.Host
     VERSION 1.0
     RESOURCE_PREFIX /
-    QML_FILES
-        qml/Main.qml
-        qml/SideMenu.qml
-        qml/MenuItemCustom.qml
-        qml/ErrorDialog.qml
-    RESOURCES
-        qml/images/logo.svg
+    QML_FILES ${HOST_QML_FILES}
+    RESOURCES ${HOST_RESOURCES}
     OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml/MPF/Host
 )
 
