@@ -5,6 +5,8 @@
 #include <QMetaObject>
 #include <QRegularExpression>
 #include <QDebug>
+#include <QFile>
+#include <QDir>
 
 namespace mpf {
 
@@ -18,6 +20,8 @@ NavigationService::~NavigationService() = default;
 
 bool NavigationService::push(const QString& route, const QVariantMap& params)
 {
+    qDebug() << "NavigationService::push called with route:" << route;
+    
     QObject* sv = stackView();
     if (!sv) {
         qWarning() << "NavigationService: StackView not found";
@@ -30,12 +34,37 @@ bool NavigationService::push(const QString& route, const QVariantMap& params)
         return false;
     }
 
+    // Debug: check if the qrc resource exists
+    QUrl url = component.toUrl();
+    qDebug() << "NavigationService: Resolved component URL:" << url.toString();
+    
+    if (url.scheme() == "qrc") {
+        // Check if qrc resource exists
+        QString resourcePath = ":/" + url.path().mid(1); // Convert qrc:/path to :/path
+        QFile resourceFile(resourcePath);
+        qDebug() << "NavigationService: Checking qrc resource:" << resourcePath 
+                 << "exists:" << resourceFile.exists();
+        
+        if (!resourceFile.exists()) {
+            qWarning() << "NavigationService: QRC resource does NOT exist:" << resourcePath;
+            // List what resources are available in the parent directory
+            QString parentPath = resourcePath.left(resourcePath.lastIndexOf('/'));
+            QDir resourceDir(parentPath);
+            qDebug() << "NavigationService: Contents of" << parentPath << ":"
+                     << resourceDir.entryList();
+        }
+    }
+
+    qDebug() << "NavigationService: Calling navPush...";
+    
     // Push to stack
     QVariant result;
     QMetaObject::invokeMethod(sv, "navPush", 
         Q_RETURN_ARG(QVariant, result),
         Q_ARG(QVariant, component),
         Q_ARG(QVariant, QVariant::fromValue(params)));
+
+    qDebug() << "NavigationService: navPush returned:" << result.isValid();
 
     if (result.isValid()) {
         StackEntry entry{route, params};
