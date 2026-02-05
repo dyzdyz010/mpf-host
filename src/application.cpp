@@ -156,6 +156,17 @@ void Application::setupPaths()
     
     // Create config directory if needed
     QDir().mkpath(m_configPath);
+    
+    // Check for development plugin path override (MPF_PLUGIN_PATH environment variable)
+    // Supports multiple paths separated by platform-specific separator (; on Windows, : on Unix)
+    QString envPluginPaths = qEnvironmentVariable("MPF_PLUGIN_PATH");
+    if (!envPluginPaths.isEmpty()) {
+        m_extraPluginPaths = envPluginPaths.split(QDir::listSeparator(), Qt::SkipEmptyParts);
+        for (QString& path : m_extraPluginPaths) {
+            path = QDir(path).absolutePath();
+        }
+        qDebug() << "Development plugin paths (MPF_PLUGIN_PATH):" << m_extraPluginPaths;
+    }
 
     // Optional override via config file
     QString pathsConfig = QDir(m_configPath).filePath("paths.json");
@@ -308,9 +319,21 @@ void Application::loadPlugins()
                 qWarning() << "Plugin error:" << id << "-" << err; 
             });
     
-    // Discover plugins
-    int count = m_pluginManager->discover(m_pluginPath);
-    qDebug() << "Discovered" << count << "plugins";
+    // Discover plugins from extra paths first (development overrides, higher priority)
+    // This allows linked source plugins to override SDK binary plugins
+    int count = 0;
+    for (const QString& path : m_extraPluginPaths) {
+        int found = m_pluginManager->discover(path);
+        qDebug() << "Discovered" << found << "plugins from development path:" << path;
+        count += found;
+    }
+    
+    // Then discover from default plugin path (SDK fallback)
+    int defaultCount = m_pluginManager->discover(m_pluginPath);
+    qDebug() << "Discovered" << defaultCount << "plugins from default path:" << m_pluginPath;
+    count += defaultCount;
+    
+    qDebug() << "Total discovered" << count << "plugins";
     
     // Load, initialize, and start
     if (m_pluginManager->loadAll()) {
