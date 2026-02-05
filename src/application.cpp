@@ -28,7 +28,6 @@
 #include <QJsonParseError>
 #include <QUrl>
 #include <QStandardPaths>
-#include <QRegularExpression>
 #include <QDebug>
 
 namespace mpf {
@@ -111,43 +110,42 @@ QStringList Application::arguments() const
     return m_app->arguments();
 }
 
-// Helper: expand environment variables in path string
-// Supports ${VAR}, $VAR (Unix), and %VAR% (Windows) syntax
-static QString expandEnvVars(const QString& path)
-{
-    QString result = path;
-    
-    // Expand ${VAR} syntax (cross-platform)
-    static QRegularExpression re1(R"(\$\{([^}]+)\})");
-    QRegularExpressionMatchIterator it1 = re1.globalMatch(result);
-    while (it1.hasNext()) {
-        QRegularExpressionMatch match = it1.next();
-        QString varName = match.captured(1);
-        QString varValue = qEnvironmentVariable(varName.toUtf8().constData());
-        result.replace(match.captured(0), varValue);
-    }
-    
-    // Expand %VAR% syntax (Windows)
-    static QRegularExpression re2(R"(%([^%]+)%)");
-    QRegularExpressionMatchIterator it2 = re2.globalMatch(result);
-    while (it2.hasNext()) {
-        QRegularExpressionMatch match = it2.next();
-        QString varName = match.captured(1);
-        QString varValue = qEnvironmentVariable(varName.toUtf8().constData());
-        result.replace(match.captured(0), varValue);
-    }
-    
-    return result;
-}
-
 void Application::setupPaths()
 {
     QString appDir = QCoreApplication::applicationDirPath();
     
-    // Determine paths relative to executable
-    m_pluginPath = appDir + "/../plugins";
-    m_qmlPath = appDir + "/../qml";
-    m_configPath = appDir + "/../config";
+    // Check for MPF_SDK_ROOT environment variable (set by mpf-dev)
+    // This takes precedence over relative paths
+    QString sdkRoot = qEnvironmentVariable("MPF_SDK_ROOT");
+    
+    if (!sdkRoot.isEmpty() && QDir(sdkRoot).exists()) {
+        // Running via mpf-dev: use SDK directory structure
+        qDebug() << "Using MPF SDK root:" << sdkRoot;
+        m_pluginPath = QDir(sdkRoot).filePath("plugins");
+        m_qmlPath = QDir(sdkRoot).filePath("qml");
+        m_configPath = QDir(sdkRoot).filePath("config");
+        
+        // Add SDK bin to library path for DLL dependencies
+        QString sdkBinPath = QDir(sdkRoot).filePath("bin");
+        if (QDir(sdkBinPath).exists()) {
+            m_app->addLibraryPath(sdkBinPath);
+#ifdef Q_OS_WIN
+            // On Windows, add SDK bin to PATH for DLL dependencies
+            QByteArray currentPath = qgetenv("PATH");
+            QByteArray newPath = sdkBinPath.toLocal8Bit() + ";" + currentPath;
+            qputenv("PATH", newPath);
+            qDebug() << "Added SDK bin to PATH:" << sdkBinPath;
+#endif
+        }
+        
+        // Add SDK qml to extra paths (will be overridden by linked components via QML_IMPORT_PATH)
+        m_extraQmlPaths.append(QDir(m_qmlPath).absolutePath());
+    } else {
+        // Local development / installed mode: use paths relative to executable
+        m_pluginPath = appDir + "/../plugins";
+        m_qmlPath = appDir + "/../qml";
+        m_configPath = appDir + "/../config";
+    }
     
     // Normalize paths
     m_pluginPath = QDir(m_pluginPath).absolutePath();
@@ -157,7 +155,7 @@ void Application::setupPaths()
     // Create config directory if needed
     QDir().mkpath(m_configPath);
     
-    // Check for development plugin path override (MPF_PLUGIN_PATH environment variable)
+    // MPF_PLUGIN_PATH: additional plugin search paths (set by mpf-dev for linked plugins)
     // Supports multiple paths separated by platform-specific separator (; on Windows, : on Unix)
     QString envPluginPaths = qEnvironmentVariable("MPF_PLUGIN_PATH");
     if (!envPluginPaths.isEmpty()) {
@@ -165,71 +163,7 @@ void Application::setupPaths()
         for (QString& path : m_extraPluginPaths) {
             path = QDir(path).absolutePath();
         }
-        qDebug() << "Development plugin paths (MPF_PLUGIN_PATH):" << m_extraPluginPaths;
-    }
-
-    // Optional override via config file
-    QString pathsConfig = QDir(m_configPath).filePath("paths.json");
-    if (QFile::exists(pathsConfig)) {
-        QFile file(pathsConfig);
-        if (file.open(QIODevice::ReadOnly)) {
-            QJsonParseError error{};
-            QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &error);
-            if (error.error == QJsonParseError::NoError && doc.isObject()) {
-                QJsonObject obj = doc.object();
-                QString baseDir = QFileInfo(pathsConfig).absolutePath();
-                
-                // Helper to resolve path with env var expansion and relative path support
-                auto resolvePath = [&](const QString& key, QString* target) {
-                    QJsonValue value = obj.value(key);
-                    if (!value.isString()) {
-                        return;
-                    }
-                    QString raw = value.toString().trimmed();
-                    if (raw.isEmpty()) {
-                        return;
-                    }
-                    // First expand environment variables
-                    raw = expandEnvVars(raw);
-                    // Then resolve relative paths
-                    QString resolved = QDir::isAbsolutePath(raw)
-                        ? raw
-                        : QDir(baseDir).filePath(raw);
-                    *target = QDir(resolved).absolutePath();
-                };
-
-                resolvePath("pluginPath", &m_pluginPath);
-                resolvePath("qmlPath", &m_qmlPath);
-                
-                // Load extra QML import paths (e.g., SDK qml directory)
-                if (obj.contains("extraQmlPaths")) {
-                    QJsonValue extraPaths = obj.value("extraQmlPaths");
-                    if (extraPaths.isArray()) {
-                        for (const QJsonValue& v : extraPaths.toArray()) {
-                            if (v.isString()) {
-                                QString raw = v.toString().trimmed();
-                                if (!raw.isEmpty()) {
-                                    // First expand environment variables
-                                    raw = expandEnvVars(raw);
-                                    // Then resolve relative paths
-                                    QString resolved = QDir::isAbsolutePath(raw)
-                                        ? raw
-                                        : QDir(baseDir).filePath(raw);
-                                    m_extraQmlPaths.append(QDir(resolved).absolutePath());
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                qDebug() << "Loaded paths config:" << pathsConfig;
-            } else {
-                qWarning() << "Invalid paths config:" << pathsConfig
-                           << "-" << error.errorString();
-            }
-        } else {
-            qWarning() << "Failed to open paths config:" << pathsConfig;
-        }
+        qDebug() << "Extra plugin paths (MPF_PLUGIN_PATH):" << m_extraPluginPaths;
     }
     
     qDebug() << "Plugin path:" << m_pluginPath;
@@ -242,22 +176,10 @@ void Application::setupPaths()
     // Add library path for plugins
     m_app->addLibraryPath(m_pluginPath);
     
-    // Add SDK library path for plugin dependencies (e.g., mpf-http-client.dll)
-#if MPF_SDK_HAS_QML_PATH
-    // SDK bin directory is parallel to qml directory
-    QString sdkBinPath = QDir(QStringLiteral(MPF_SDK_QML_PATH)).filePath("../bin");
-    sdkBinPath = QDir(sdkBinPath).absolutePath();
-    if (QDir(sdkBinPath).exists()) {
-        m_app->addLibraryPath(sdkBinPath);
-#ifdef Q_OS_WIN
-        // On Windows, add SDK bin to PATH for DLL dependencies
-        QByteArray currentPath = qgetenv("PATH");
-        QByteArray newPath = sdkBinPath.toLocal8Bit() + ";" + currentPath;
-        qputenv("PATH", newPath);
-        qDebug() << "Added SDK bin to PATH:" << sdkBinPath;
-#endif
+    // Also add extra plugin paths to library search
+    for (const QString& path : m_extraPluginPaths) {
+        m_app->addLibraryPath(path);
     }
-#endif
 }
 
 void Application::setupLogging()
