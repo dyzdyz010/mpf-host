@@ -28,9 +28,14 @@ public:
     Q_INVOKABLE int stackDepth() const override;
     Q_INVOKABLE bool canGoBack() const override;
     Q_INVOKABLE void registerRoute(const QString& route, const QString& qmlComponent) override;
+    
+    /**
+     * @brief Get the QML page URL for a route (for Loader-based navigation)
+     */
+    Q_INVOKABLE QString getPageUrl(const QString& route) const;
 
     /**
-     * @brief Set the StackView object ID in QML
+     * @brief Set the StackView object ID in QML (deprecated - using Loader now)
      */
     void setStackViewId(const QString& id) { m_stackViewId = id; }
 

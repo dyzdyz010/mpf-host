@@ -181,6 +181,20 @@ void NavigationService::registerRoute(const QString& route, const QString& qmlCo
     qDebug() << "NavigationService: Registered route" << route << "->" << qmlComponent;
 }
 
+QString NavigationService::getPageUrl(const QString& route) const
+{
+    // Find matching route and return the URL
+    for (const RouteEntry& entry : m_routes) {
+        if (entry.pattern == route) {
+            qDebug() << "NavigationService: getPageUrl" << route << "->" << entry.component;
+            return entry.component;
+        }
+    }
+    
+    qWarning() << "NavigationService: No page URL found for route:" << route;
+    return QString();
+}
+
 QObject* NavigationService::stackView() const
 {
     if (!m_engine) return nullptr;

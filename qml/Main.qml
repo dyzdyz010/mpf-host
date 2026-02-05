@@ -26,11 +26,13 @@ ApplicationWindow {
             currentRoute: root.currentRoute
 
             onItemClicked: function (id, route) {
+                // Get the page URL from Navigation service
                 if (Navigation && route) {
-                    // Clear stack and push new route
-                    mainStackView.clear()
-                    Navigation.push(route)
-                    root.currentRoute = route
+                    var pageUrl = Navigation.getPageUrl(route)
+                    if (pageUrl) {
+                        contentLoader.loadPage(pageUrl)
+                        root.currentRoute = route
+                    }
                 }
             }
         }
@@ -59,18 +61,14 @@ ApplicationWindow {
                     anchors.margins: 12
                     spacing: 12
 
-                    // Back button
+                    // Home button (replaces back button)
                     ToolButton {
-                        visible: mainStackView.depth > 1
-                        text: "←"
+                        visible: root.currentRoute !== ""
+                        text: "🏠"
                         font.pixelSize: 20
                         onClicked: {
-                            mainStackView.pop()
-                            // Update current route
-                            if (mainStackView.currentItem
-                                    && mainStackView.currentItem.route) {
-                                root.currentRoute = mainStackView.currentItem.route
-                            }
+                            contentLoader.goHome()
+                            root.currentRoute = ""
                         }
 
                         background: Rectangle {
@@ -83,8 +81,8 @@ ApplicationWindow {
 
                     // Page title
                     Label {
-                        text: mainStackView.currentItem ? (mainStackView.currentItem.pageTitle
-                                                           || mainStackView.currentItem.title
+                        text: contentLoader.item ? (contentLoader.item.pageTitle
+                                                           || contentLoader.item.title
                                                            || "Home") : "Home"
                         font.pixelSize: 20
                         font.weight: Font.Medium
@@ -119,27 +117,36 @@ ApplicationWindow {
                 color: Theme ? Qt.darker(Theme.surfaceColor, 1.1) : "#E0E0E0"
             }
 
-            // Content stack
-            StackView {
-                id: mainStackView
-                objectName: "mainStackView"
+            // Content area - simple Loader (no StackView)
+            Loader {
+                id: contentLoader
+                objectName: "contentLoader"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-
-                initialItem: WelcomePage {}
-
-                // QML-callable wrappers for C++ navigation
-                function navPush(component, params) {
-                    return push(component, params)
+                
+                // Default to welcome page
+                sourceComponent: WelcomePage {}
+                
+                // Load plugin page by URL
+                function loadPage(url) {
+                    if (url && url.toString().length > 0) {
+                        source = url
+                    } else {
+                        sourceComponent = WelcomePage
+                    }
                 }
-                function navReplace(component, params) {
-                    return replace(component, params)
+                
+                // Go back to welcome page
+                function goHome() {
+                    source = ""
+                    sourceComponent = WelcomePage
                 }
-                function navPop() {
-                    return pop()
-                }
-                function navPopToRoot() {
-                    return pop(null, StackView.Immediate)
+                
+                onStatusChanged: {
+                    if (status === Loader.Error) {
+                        console.error("Failed to load page:", source)
+                        console.error("Error:", contentLoader.sourceComponent)
+                    }
                 }
             }
         }
@@ -277,9 +284,11 @@ ApplicationWindow {
                                                            || "")
                                     onClicked: {
                                         if (Navigation && modelData.route) {
-                                            mainStackView.clear()
-                                            Navigation.push(modelData.route)
-                                            root.currentRoute = modelData.route
+                                            var pageUrl = Navigation.getPageUrl(modelData.route)
+                                            if (pageUrl) {
+                                                contentLoader.loadPage(pageUrl)
+                                                root.currentRoute = modelData.route
+                                            }
                                         }
                                     }
                                 }
