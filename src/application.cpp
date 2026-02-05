@@ -323,12 +323,13 @@ bool Application::loadMainQml()
     // Fall back to host's Main.qml
     if (entryQml.isEmpty()) {
         // Try filesystem path first (development), then qrc (release)
-        QString fsPath = m_qmlPath + "/MPF/Host/qml/Main.qml";
+        // Note: QT_RESOURCE_ALIAS flattens paths, so no /qml/ subdirectory
+        QString fsPath = m_qmlPath + "/MPF/Host/Main.qml";
         if (QFile::exists(fsPath)) {
             entryQml = QUrl::fromLocalFile(fsPath).toString();
         } else {
-            // RESOURCE_PREFIX "/" means qrc:/MPF/Host/qml/Main.qml
-            entryQml = "qrc:/MPF/Host/qml/Main.qml";
+            // RESOURCE_PREFIX "/" + QT_RESOURCE_ALIAS means qrc:/MPF/Host/Main.qml
+            entryQml = "qrc:/MPF/Host/Main.qml";
         }
     }
     
