@@ -1,8 +1,11 @@
 #include "navigation_service.h"
+#include "cross_dll_safety.h"
 #include <QQmlApplicationEngine>
 #include <QDebug>
 
 namespace mpf {
+
+using CrossDllSafety::deepCopy;
 
 NavigationService::NavigationService(QQmlApplicationEngine* engine, QObject* parent)
     : QObject(parent)
@@ -14,7 +17,8 @@ NavigationService::~NavigationService() = default;
 
 void NavigationService::registerRoute(const QString& route, const QString& qmlPageUrl)
 {
-    RouteEntry entry{route, qmlPageUrl};
+    // Deep copy strings from plugin to ensure they're in host's heap
+    RouteEntry entry{deepCopy(route), deepCopy(qmlPageUrl)};
     m_routes.append(entry);
     qDebug() << "NavigationService: Registered route" << route << "->" << qmlPageUrl;
 }
@@ -24,7 +28,8 @@ QString NavigationService::getPageUrl(const QString& route) const
     for (const RouteEntry& entry : m_routes) {
         if (entry.pattern == route) {
             qDebug() << "NavigationService: getPageUrl" << route << "->" << entry.pageUrl;
-            return entry.pageUrl;
+            // Deep copy before returning to ensure caller gets memory from host's heap
+            return deepCopy(entry.pageUrl);
         }
     }
     
@@ -34,14 +39,15 @@ QString NavigationService::getPageUrl(const QString& route) const
 
 QString NavigationService::currentRoute() const
 {
-    return m_currentRoute;
+    return deepCopy(m_currentRoute);
 }
 
 void NavigationService::setCurrentRoute(const QString& route)
 {
-    if (m_currentRoute != route) {
-        m_currentRoute = route;
-        emit navigationChanged(route, {});
+    QString routeCopy = deepCopy(route);
+    if (m_currentRoute != routeCopy) {
+        m_currentRoute = routeCopy;
+        emit navigationChanged(routeCopy, {});
     }
 }
 

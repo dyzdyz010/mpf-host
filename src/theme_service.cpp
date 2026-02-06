@@ -1,10 +1,13 @@
 #include "theme_service.h"
+#include "cross_dll_safety.h"
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QDebug>
 
 namespace mpf {
+
+using CrossDllSafety::deepCopy;
 
 // ThemeData
 
@@ -104,7 +107,7 @@ void ThemeService::setTheme(const QString& themeName)
 
 QStringList ThemeService::availableThemes() const
 {
-    return m_themes.keys();
+    return deepCopy(m_themes.keys());
 }
 
 void ThemeService::registerTheme(const ThemeData& theme)

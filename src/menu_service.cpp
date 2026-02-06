@@ -1,8 +1,27 @@
 #include "menu_service.h"
+#include "cross_dll_safety.h"
 #include <algorithm>
 #include <QDebug>
 
 namespace mpf {
+
+using CrossDllSafety::deepCopy;
+
+// Deep copy a MenuItem to ensure all strings are in host's heap
+static MenuItem deepCopyItem(const MenuItem& item)
+{
+    MenuItem result;
+    result.id = deepCopy(item.id);
+    result.label = deepCopy(item.label);
+    result.icon = deepCopy(item.icon);
+    result.route = deepCopy(item.route);
+    result.group = deepCopy(item.group);
+    result.order = item.order;
+    result.enabled = item.enabled;
+    result.badge = deepCopy(item.badge);
+    result.pluginId = deepCopy(item.pluginId);
+    return result;
+}
 
 MenuService::MenuService(QObject* parent)
     : QObject(parent)
@@ -25,7 +44,8 @@ bool MenuService::registerItem(const MenuItem& item)
         return false;
     }
     
-    m_items.append(item);
+    // Deep copy to ensure all strings are in host's heap
+    m_items.append(deepCopyItem(item));
     sortItems();
     
     // Rebuild index map after sorting
@@ -129,7 +149,13 @@ void MenuService::setEnabled(const QString& id, bool enabled)
 QList<MenuItem> MenuService::items() const
 {
     QMutexLocker locker(&m_mutex);
-    return m_items;
+    // Deep copy each item before returning
+    QList<MenuItem> result;
+    result.reserve(m_items.size());
+    for (const MenuItem& item : m_items) {
+        result.append(deepCopyItem(item));
+    }
+    return result;
 }
 
 QVariantList MenuService::itemsAsVariant() const
@@ -137,7 +163,8 @@ QVariantList MenuService::itemsAsVariant() const
     QMutexLocker locker(&m_mutex);
     QVariantList result;
     for (const MenuItem& item : m_items) {
-        result.append(item.toVariantMap());
+        // toVariantMap creates new QVariants, then deep copy the map
+        result.append(deepCopy(item.toVariantMap()));
     }
     return result;
 }
@@ -148,7 +175,7 @@ QVariantList MenuService::itemsInGroup(const QString& group) const
     QVariantList result;
     for (const MenuItem& item : m_items) {
         if (item.group == group) {
-            result.append(item.toVariantMap());
+            result.append(deepCopy(item.toVariantMap()));
         }
     }
     return result;
@@ -163,7 +190,7 @@ QStringList MenuService::groups() const
             groupSet.insert(item.group);
         }
     }
-    return groupSet.values();
+    return deepCopy(groupSet.values());
 }
 
 int MenuService::count() const

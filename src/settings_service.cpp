@@ -1,8 +1,11 @@
 #include "settings_service.h"
+#include "cross_dll_safety.h"
 #include <QStandardPaths>
 #include <QDir>
 
 namespace mpf {
+
+using CrossDllSafety::deepCopy;
 
 SettingsService::SettingsService(QObject* parent)
     : QObject(parent)
@@ -25,7 +28,8 @@ QVariant SettingsService::value(const QString& pluginId,
                                  const QString& key, 
                                  const QVariant& defaultValue) const
 {
-    return m_settings->value(makeKey(pluginId, key), defaultValue);
+    // Deep copy the returned value to avoid cross-DLL heap issues
+    return deepCopy(m_settings->value(makeKey(pluginId, key), defaultValue));
 }
 
 void SettingsService::setValue(const QString& pluginId, 
@@ -56,7 +60,7 @@ QStringList SettingsService::keys(const QString& pluginId) const
     m_settings->beginGroup(pluginId);
     QStringList result = m_settings->childKeys();
     m_settings->endGroup();
-    return result;
+    return deepCopy(result);
 }
 
 void SettingsService::sync()

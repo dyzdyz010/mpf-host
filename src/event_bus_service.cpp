@@ -1,4 +1,5 @@
 #include "event_bus_service.h"
+#include "cross_dll_safety.h"
 
 #include <QDateTime>
 #include <QMetaObject>
@@ -8,6 +9,8 @@
 #include <algorithm>
 
 namespace mpf {
+
+using CrossDllSafety::deepCopy;
 
 EventBusService::EventBusService(QObject* parent)
     : QObject(parent)
@@ -100,15 +103,16 @@ QString EventBusService::subscribe(const QString& pattern,
 {
     Subscription sub;
     sub.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    sub.pattern = pattern;
-    sub.subscriberId = subscriberId;
+    // Deep copy strings from plugin to ensure they're in host's heap
+    sub.pattern = deepCopy(pattern);
+    sub.subscriberId = deepCopy(subscriberId);
     sub.options = options;
     sub.regex = compilePattern(pattern);
 
     {
         QMutexLocker locker(&m_mutex);
         m_subscriptions.insert(sub.id, sub);
-        m_subscriberIndex[subscriberId].append(sub.id);
+        m_subscriberIndex[sub.subscriberId].append(sub.id);
     }
 
     qDebug() << "EventBus: Subscribed" << subscriberId << "to" << pattern
@@ -118,7 +122,8 @@ QString EventBusService::subscribe(const QString& pattern,
     emit subscribersChanged();
     emit topicsChanged();
 
-    return sub.id;
+    // Deep copy before returning
+    return deepCopy(sub.id);
 }
 
 bool EventBusService::unsubscribe(const QString& subscriptionId)
@@ -197,7 +202,7 @@ QStringList EventBusService::activeTopics() const
     for (auto it = m_subscriptions.constBegin(); it != m_subscriptions.constEnd(); ++it) {
         patterns.insert(it->pattern);
     }
-    return patterns.values();
+    return deepCopy(patterns.values());
 }
 
 TopicStats EventBusService::topicStats(const QString& topic) const
@@ -228,7 +233,7 @@ TopicStats EventBusService::topicStats(const QString& topic) const
 QStringList EventBusService::subscriptionsFor(const QString& subscriberId) const
 {
     QMutexLocker locker(&m_mutex);
-    return m_subscriberIndex.value(subscriberId);
+    return deepCopy(m_subscriberIndex.value(subscriberId));
 }
 
 bool EventBusService::matchesTopic(const QString& topic, const QString& pattern) const
@@ -244,7 +249,7 @@ QString EventBusService::subscribeSimple(const QString& pattern, const QString& 
 
 QVariantMap EventBusService::topicStatsAsVariant(const QString& topic) const
 {
-    return topicStats(topic).toVariantMap();
+    return deepCopy(topicStats(topic).toVariantMap());
 }
 
 int EventBusService::totalSubscribers() const
