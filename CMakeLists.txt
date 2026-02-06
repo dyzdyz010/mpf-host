@@ -17,6 +17,13 @@ endif()
 # SDK (installed via CMAKE_PREFIX_PATH)
 find_package(MPF REQUIRED)
 
+# UI Components - MUST be linked by host to avoid cross-DLL heap issues
+# Plugins should NOT link this; they access it via QML_IMPORT_PATH
+find_package(MPFUIComponents QUIET)
+if(MPFUIComponents_FOUND)
+    message(STATUS "Found MPFUIComponents - will be loaded by host")
+endif()
+
 # Generate version header
 configure_file(
     cmake/version.h.in
@@ -88,6 +95,8 @@ target_link_libraries(mpf-host PRIVATE
     Qt6::Qml
     Qt6::Quick
     MPF::foundation-sdk
+    # UI Components - link here to ensure single heap for QML components
+    $<$<TARGET_EXISTS:MPF::mpf-ui-components>:MPF::mpf-ui-components>
 )
 
 # QML files - just add new files to this list
