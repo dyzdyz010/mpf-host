@@ -132,13 +132,10 @@ set_target_properties(mpf-host PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
-# Create plugins directory
+# Create output directories
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/plugins)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/qml)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/config)
-
-# Copy default config files to build output
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/config/ DESTINATION ${CMAKE_BINARY_DIR}/config)
 
 # ============================================
 # Development environment configuration
@@ -197,8 +194,4 @@ install(TARGETS mpf-host
 
 install(DIRECTORY ${CMAKE_BINARY_DIR}/qml/
     DESTINATION qml
-)
-
-install(DIRECTORY ${CMAKE_BINARY_DIR}/config/
-    DESTINATION config
 )

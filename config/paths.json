@@ -1,7 +1,0 @@
-{
-  "pluginPath": "../plugins",
-  "qmlPath": "",
-  "extraQmlPaths": [
-    "${MPF_SDK}/qml"
-  ]
-}
