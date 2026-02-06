@@ -1,0 +1,31 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "MPF Dev (MinGW)",
+      "generator": "MinGW Makefiles",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.3/mingw_64;C:/Users/YOUR_USERNAME/.mpf-sdk/current",
+        "QML_IMPORT_PATH": "C:/Users/YOUR_USERNAME/.mpf-sdk/current/qml;C:/Qt/6.8.3/mingw_64/qml"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "MPF Release (MinGW)",
+      "generator": "MinGW Makefiles",
+      "binaryDir": "${sourceDir}/build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.3/mingw_64;C:/Users/YOUR_USERNAME/.mpf-sdk/current",
+        "QML_IMPORT_PATH": "C:/Users/YOUR_USERNAME/.mpf-sdk/current/qml;C:/Qt/6.8.3/mingw_64/qml"
+      }
+    }
+  ],
+  "buildPresets": [
+    {"name": "dev", "configurePreset": "dev"},
+    {"name": "release", "configurePreset": "release"}
+  ]
+}
