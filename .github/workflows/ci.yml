@@ -110,6 +110,7 @@ jobs:
             -p "mpf-ui-components-${{ matrix.artifact_suffix }}.${{ matrix.ext }}"
           [[ "${{ matrix.ext }}" == "tar.gz" ]] && tar -xzf *.tar.gz || 7z x *.zip
           rm -f *.${{ matrix.ext }}
+          cd ../..
         env:
           GH_TOKEN: ${{ github.token }}
 
