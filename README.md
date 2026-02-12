@@ -6,12 +6,12 @@ Qt Modular Plugin Framework - Host Application
 
 MPF Host 是插件框架的宿主应用，负责：
 - 加载和管理插件
-- 实现核心服务 (NavigationService, MenuService, etc.)
+- 实现核心服务 (EventBusService, NavigationService, MenuService, etc.)
 - 提供 QML Shell
 
 ## 依赖
 
-- Qt 6.5+ (Core, Gui, Qml, Quick)
+- Qt 6.8+ (Core, Gui, Qml, Quick)
 - mpf-sdk
 - mpf-ui-components (可选)
 
@@ -51,6 +51,14 @@ vim build/config/paths.json
 ```
 
 支持环境变量：`${VAR}` (跨平台) 和 `%VAR%` (Windows)
+
+## 测试
+
+```bash
+cd tests/build
+./test_event_bus              # EventBus 单元测试（27 个）
+./test_plugin_dependencies    # 插件依赖测试（10 个）
+```
 
 ## 许可证
 
