@@ -81,6 +81,13 @@ public:
     QString entryQml(const QString& pluginId) const;
 
     /**
+     * @brief Resolve a service dependency to the plugin ID that provides it
+     * @param serviceId Service name from the "provides" field
+     * @return Plugin ID of the provider, or empty string if not found
+     */
+    QString resolveServiceProvider(const QString& serviceId) const;
+
+    /**
      * @brief Check if all dependencies are satisfied
      * @param metadata Plugin metadata to check
      * @return List of unsatisfied dependencies (empty if all satisfied)
@@ -111,6 +118,7 @@ private:
     ServiceRegistry* m_registry;
     std::vector<std::unique_ptr<PluginLoader>> m_loaders;
     QHash<QString, PluginLoader*> m_pluginMap;
+    QHash<QString, QString> m_serviceProviderMap;  // service name -> plugin ID
 };
 
 } // namespace mpf

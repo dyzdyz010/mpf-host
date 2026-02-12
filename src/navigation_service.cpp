@@ -7,13 +7,19 @@ namespace mpf {
 
 using CrossDllSafety::deepCopy;
 
-NavigationService::NavigationService(QQmlApplicationEngine* engine, QObject* parent)
+NavigationService::NavigationService(QObject* parent)
     : QObject(parent)
-    , m_engine(engine)
+    , m_engine(nullptr)
 {
 }
 
 NavigationService::~NavigationService() = default;
+
+void NavigationService::setEngine(QQmlApplicationEngine* engine)
+{
+    m_engine = engine;
+    qDebug() << "NavigationService: Engine set";
+}
 
 void NavigationService::registerRoute(const QString& route, const QString& qmlPageUrl)
 {

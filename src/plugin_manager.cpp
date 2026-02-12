@@ -72,6 +72,17 @@ int PluginManager::discover(const QString& path)
         m_pluginMap[id] = loader.get();
         m_loaders.push_back(std::move(loader));
         
+        // Build service provider map from "provides" metadata
+        for (const QString& service : metadata.provides()) {
+            if (m_serviceProviderMap.contains(service)) {
+                qWarning() << "Service" << service << "already provided by"
+                           << m_serviceProviderMap[service] << "- duplicate from" << id;
+            } else {
+                m_serviceProviderMap[service] = id;
+                qDebug() << "Service" << service << "provided by" << id;
+            }
+        }
+        
         emit pluginDiscovered(id);
         count++;
     }
@@ -196,6 +207,7 @@ void PluginManager::unloadAll()
 
     m_pluginMap.clear();
     m_loaders.clear();
+    m_serviceProviderMap.clear();
 }
 
 QList<PluginLoader*> PluginManager::plugins() const
@@ -250,9 +262,12 @@ QStringList PluginManager::checkDependencies(const PluginMetadata& metadata) con
                 unsatisfied.append(QString("plugin:%1>=%2")
                     .arg(dep.id, dep.minVersion.toString()));
             }
-        } else {
-            // Service dependency - check at runtime
-            // We can't fully check this until initialization
+        } else if (dep.type == PluginDependency::Type::Service) {
+            // Resolve service dependency via provides map
+            QString providerId = resolveServiceProvider(dep.id);
+            if (providerId.isEmpty()) {
+                unsatisfied.append(QString("service:%1").arg(dep.id));
+            }
         }
     }
     
@@ -294,11 +309,18 @@ bool PluginManager::topologicalSort(const QString& id,
     PluginLoader* loader = m_pluginMap.value(id);
     if (loader) {
         for (const PluginDependency& dep : loader->metadata().requires()) {
+            QString depPluginId;
+            
             if (dep.type == PluginDependency::Type::Plugin) {
-                if (m_pluginMap.contains(dep.id)) {
-                    if (!topologicalSort(dep.id, state, order)) {
-                        return false;
-                    }
+                depPluginId = dep.id;
+            } else if (dep.type == PluginDependency::Type::Service) {
+                // Resolve service dependency to plugin ID via provides map
+                depPluginId = resolveServiceProvider(dep.id);
+            }
+            
+            if (!depPluginId.isEmpty() && m_pluginMap.contains(depPluginId)) {
+                if (!topologicalSort(depPluginId, state, order)) {
+                    return false;
                 }
             }
         }
@@ -307,6 +329,11 @@ bool PluginManager::topologicalSort(const QString& id,
     state[id] = 2; // Visited
     order.append(id);
     return true;
+}
+
+QString PluginManager::resolveServiceProvider(const QString& serviceId) const
+{
+    return m_serviceProviderMap.value(serviceId);
 }
 
 } // namespace mpf

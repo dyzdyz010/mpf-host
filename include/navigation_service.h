@@ -19,8 +19,14 @@ class NavigationService : public QObject, public INavigation
     Q_OBJECT
 
 public:
-    explicit NavigationService(QQmlApplicationEngine* engine, QObject* parent = nullptr);
+    explicit NavigationService(QObject* parent = nullptr);
     ~NavigationService() override;
+
+    /**
+     * @brief Set the QML engine reference (called after engine is created)
+     * Replaces the previous dangerous placement-new pattern.
+     */
+    void setEngine(QQmlApplicationEngine* engine);
 
     // INavigation interface
     Q_INVOKABLE void registerRoute(const QString& route, const QString& qmlPageUrl) override;

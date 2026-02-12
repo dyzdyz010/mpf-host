@@ -42,6 +42,35 @@ set_tests_properties(EventBusTest PROPERTIES
     FAIL_REGULAR_EXPRESSION "FAIL!"
 )
 
-# Optional: Add more test executables here
-# add_executable(test_xxx ...)
-# add_test(NAME XxxTest COMMAND test_xxx)
+# Plugin Dependencies Test
+set(PLUGIN_DEPS_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/plugin_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/plugin_loader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/plugin_metadata.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/service_registry.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include/plugin_manager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include/plugin_loader.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include/plugin_metadata.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include/service_registry.h
+)
+
+add_executable(test_plugin_dependencies
+    test_plugin_dependencies.cpp
+    ${PLUGIN_DEPS_SOURCES}
+)
+
+target_include_directories(test_plugin_dependencies PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+target_link_libraries(test_plugin_dependencies PRIVATE
+    Qt6::Core
+    Qt6::Test
+    MPF::foundation-sdk
+)
+
+add_test(NAME PluginDependenciesTest COMMAND test_plugin_dependencies)
+
+set_tests_properties(PluginDependenciesTest PROPERTIES
+    FAIL_REGULAR_EXPRESSION "FAIL!"
+)

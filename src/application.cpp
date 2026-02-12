@@ -65,7 +65,7 @@ bool Application::initialize()
     m_registry = std::make_unique<ServiceRegistryImpl>(this);
     
     // Create and register core services
-    auto* navigation = new NavigationService(nullptr, this);
+    auto* navigation = new NavigationService(this);
     auto* settings = new SettingsService(m_configPath, this);
     auto* theme = new ThemeService(this);
     auto* menu = new MenuService(this);
@@ -81,9 +81,8 @@ bool Application::initialize()
     // Create QML engine
     m_engine = std::make_unique<QQmlApplicationEngine>();
     
-    // Update navigation with engine reference
-    static_cast<NavigationService*>(navigation)->~NavigationService();
-    new (navigation) NavigationService(m_engine.get(), this);
+    // Set engine reference on navigation (safe setter, no placement new)
+    navigation->setEngine(m_engine.get());
     
     setupQmlContext();
     loadPlugins();

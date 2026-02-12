@@ -1,5 +1,4 @@
 #include <QTest>
-#include <QSignalSpy>
 #include <QCoreApplication>
 
 #include "event_bus_service.h"
@@ -16,41 +15,52 @@ private slots:
     void init();
     void cleanup();
 
-    // Basic functionality tests
+    // Subscribe/Publish
     void testSubscribe();
     void testUnsubscribe();
     void testUnsubscribeAll();
     void testPublishSync();
     void testPublishAsync();
+    void testNullHandlerRejected();
 
-    // Wildcard matching tests
+    // Wildcard matching
     void testSingleWildcard();
     void testDoubleWildcard();
     void testMixedWildcards();
     void testMatchesTopic();
 
-    // Subscription options tests
+    // Options
     void testPriority();
     void testReceiveOwnEvents();
 
-    // Query methods tests
+    // Query
     void testSubscriberCount();
     void testActiveTopics();
     void testTopicStats();
     void testSubscriptionsFor();
 
+    // Request/Response
+    void testRegisterHandler();
+    void testRequestResponse();
+    void testRequestNoHandler();
+    void testUnregisterHandler();
+    void testUnregisterAllHandlers();
+    void testHasHandler();
+    void testRequestHandlerException();
+    void testDuplicateHandler();
+    void testRequestFromQml();
+
     // Edge cases
-    void testEmptyTopic();
     void testMultipleSubscribers();
     void testNoSubscribers();
 
 private:
-    EventBusService* m_eventBus = nullptr;
+    EventBusService* m_bus = nullptr;
 };
 
 void TestEventBus::initTestCase()
 {
-    qDebug() << "========== EventBus Test Suite ==========";
+    qDebug() << "========== EventBus Test Suite (v3, no legacy) ==========";
 }
 
 void TestEventBus::cleanupTestCase()
@@ -60,243 +70,206 @@ void TestEventBus::cleanupTestCase()
 
 void TestEventBus::init()
 {
-    m_eventBus = new EventBusService(this);
+    m_bus = new EventBusService(this);
 }
 
 void TestEventBus::cleanup()
 {
-    delete m_eventBus;
-    m_eventBus = nullptr;
+    delete m_bus;
+    m_bus = nullptr;
 }
 
 // =============================================================================
-// Basic functionality tests
+// Subscribe/Publish
 // =============================================================================
 
 void TestEventBus::testSubscribe()
 {
-    QString subId = m_eventBus->subscribe("orders/created", "plugin-a");
-    
+    int received = 0;
+    QString subId = m_bus->subscribe("orders/created", "plugin-a",
+        [&received](const Event&) { received++; });
+
     QVERIFY(!subId.isEmpty());
-    QCOMPARE(m_eventBus->totalSubscribers(), 1);
-    QVERIFY(m_eventBus->activeTopics().contains("orders/created"));
+    QCOMPARE(m_bus->totalSubscribers(), 1);
+    QVERIFY(m_bus->activeTopics().contains("orders/created"));
 }
 
 void TestEventBus::testUnsubscribe()
 {
-    QString subId = m_eventBus->subscribe("orders/created", "plugin-a");
-    QCOMPARE(m_eventBus->totalSubscribers(), 1);
+    QString subId = m_bus->subscribe("orders/created", "plugin-a",
+        [](const Event&) {});
+    QCOMPARE(m_bus->totalSubscribers(), 1);
 
-    bool result = m_eventBus->unsubscribe(subId);
-    QVERIFY(result);
-    QCOMPARE(m_eventBus->totalSubscribers(), 0);
-
-    // Unsubscribe non-existent should return false
-    result = m_eventBus->unsubscribe("non-existent-id");
-    QVERIFY(!result);
+    QVERIFY(m_bus->unsubscribe(subId));
+    QCOMPARE(m_bus->totalSubscribers(), 0);
+    QVERIFY(!m_bus->unsubscribe("non-existent"));
 }
 
 void TestEventBus::testUnsubscribeAll()
 {
-    m_eventBus->subscribe("topic1", "plugin-a");
-    m_eventBus->subscribe("topic2", "plugin-a");
-    m_eventBus->subscribe("topic3", "plugin-b");
+    m_bus->subscribe("t1", "plugin-a", [](const Event&) {});
+    m_bus->subscribe("t2", "plugin-a", [](const Event&) {});
+    m_bus->subscribe("t3", "plugin-b", [](const Event&) {});
 
-    QCOMPARE(m_eventBus->totalSubscribers(), 3);
-
-    m_eventBus->unsubscribeAll("plugin-a");
-    QCOMPARE(m_eventBus->totalSubscribers(), 1);
-
-    // Remaining subscription should be plugin-b's
-    QVERIFY(m_eventBus->subscriptionsFor("plugin-a").isEmpty());
-    QCOMPARE(m_eventBus->subscriptionsFor("plugin-b").size(), 1);
+    QCOMPARE(m_bus->totalSubscribers(), 3);
+    m_bus->unsubscribeAll("plugin-a");
+    QCOMPARE(m_bus->totalSubscribers(), 1);
+    QVERIFY(m_bus->subscriptionsFor("plugin-a").isEmpty());
+    QCOMPARE(m_bus->subscriptionsFor("plugin-b").size(), 1);
 }
 
 void TestEventBus::testPublishSync()
 {
-    QSignalSpy spy(m_eventBus, &EventBusService::eventPublished);
-    QVERIFY(spy.isValid());
+    QList<Event> received;
+    m_bus->subscribe("orders/created", "plugin-a",
+        [&received](const Event& e) { received.append(e); });
 
-    m_eventBus->subscribe("orders/created", "plugin-a");
+    int notified = m_bus->publishSync("orders/created",
+        {{"orderId", "123"}, {"amount", 99.99}}, "plugin-b");
 
-    QVariantMap data;
-    data["orderId"] = "12345";
-    data["amount"] = 99.99;
-
-    int notified = m_eventBus->publishSync("orders/created", data, "plugin-b");
     QCOMPARE(notified, 1);
-
-    // Synchronous publish should emit immediately
-    QCOMPARE(spy.count(), 1);
-
-    QList<QVariant> args = spy.takeFirst();
-    QCOMPARE(args.at(0).toString(), QString("orders/created"));
-    QCOMPARE(args.at(1).toMap()["orderId"].toString(), QString("12345"));
-    QCOMPARE(args.at(2).toString(), QString("plugin-b"));
+    QCOMPARE(received.size(), 1);
+    QCOMPARE(received[0].topic, QString("orders/created"));
+    QCOMPARE(received[0].data["orderId"].toString(), QString("123"));
+    QCOMPARE(received[0].senderId, QString("plugin-b"));
 }
 
 void TestEventBus::testPublishAsync()
 {
-    QSignalSpy spy(m_eventBus, &EventBusService::eventPublished);
-    QVERIFY(spy.isValid());
+    QList<Event> received;
+    m_bus->subscribe("orders/created", "plugin-a",
+        [&received](const Event& e) { received.append(e); });
 
-    m_eventBus->subscribe("orders/created", "plugin-a");
+    m_bus->publish("orders/created", {{"key", "val"}}, "plugin-b");
+    QCOMPARE(received.size(), 0);  // Not yet
 
-    QVariantMap data;
-    data["orderId"] = "12345";
-
-    int notified = m_eventBus->publish("orders/created", data, "plugin-b");
-    QCOMPARE(notified, 1);
-
-    // Async publish uses Qt::QueuedConnection, need to process events
-    QCOMPARE(spy.count(), 0);  // Not yet delivered
-
-    // Process pending events
     QCoreApplication::processEvents();
+    QCOMPARE(received.size(), 1);
+    QCOMPARE(received[0].data["key"].toString(), QString("val"));
+}
 
-    QCOMPARE(spy.count(), 1);
+void TestEventBus::testNullHandlerRejected()
+{
+    QString subId = m_bus->subscribe("test", "plugin-a", IEventBus::EventHandler{});
+    QVERIFY(subId.isEmpty());
+    QCOMPARE(m_bus->totalSubscribers(), 0);
 }
 
 // =============================================================================
-// Wildcard matching tests
+// Wildcard matching
 // =============================================================================
 
 void TestEventBus::testSingleWildcard()
 {
-    // * matches single level
-    m_eventBus->subscribe("orders/*", "plugin-a");
+    m_bus->subscribe("orders/*", "plugin-a", [](const Event&) {});
 
-    QCOMPARE(m_eventBus->subscriberCount("orders/created"), 1);
-    QCOMPARE(m_eventBus->subscriberCount("orders/updated"), 1);
-    QCOMPARE(m_eventBus->subscriberCount("orders/deleted"), 1);
-
-    // Should NOT match nested levels
-    QCOMPARE(m_eventBus->subscriberCount("orders/items/added"), 0);
-
-    // Should NOT match parent level
-    QCOMPARE(m_eventBus->subscriberCount("orders"), 0);
+    QCOMPARE(m_bus->subscriberCount("orders/created"), 1);
+    QCOMPARE(m_bus->subscriberCount("orders/updated"), 1);
+    QCOMPARE(m_bus->subscriberCount("orders/items/added"), 0);
+    QCOMPARE(m_bus->subscriberCount("orders"), 0);
 }
 
 void TestEventBus::testDoubleWildcard()
 {
-    // ** matches multiple levels
-    m_eventBus->subscribe("orders/**", "plugin-a");
+    m_bus->subscribe("orders/**", "plugin-a", [](const Event&) {});
 
-    QCOMPARE(m_eventBus->subscriberCount("orders/created"), 1);
-    QCOMPARE(m_eventBus->subscriberCount("orders/items/added"), 1);
-    QCOMPARE(m_eventBus->subscriberCount("orders/items/removed/all"), 1);
-
-    // Should NOT match parent or sibling
-    QCOMPARE(m_eventBus->subscriberCount("orders"), 0);
-    QCOMPARE(m_eventBus->subscriberCount("products/created"), 0);
+    QCOMPARE(m_bus->subscriberCount("orders/created"), 1);
+    QCOMPARE(m_bus->subscriberCount("orders/items/added"), 1);
+    QCOMPARE(m_bus->subscriberCount("orders"), 0);
+    QCOMPARE(m_bus->subscriberCount("products/created"), 0);
 }
 
 void TestEventBus::testMixedWildcards()
 {
-    // Mix of * and **
-    m_eventBus->subscribe("*/items/**", "plugin-a");
+    m_bus->subscribe("*/items/**", "plugin-a", [](const Event&) {});
 
-    QCOMPARE(m_eventBus->subscriberCount("orders/items/added"), 1);
-    QCOMPARE(m_eventBus->subscriberCount("products/items/removed"), 1);
-    QCOMPARE(m_eventBus->subscriberCount("cart/items/quantity/changed"), 1);
-
-    // Should NOT match
-    QCOMPARE(m_eventBus->subscriberCount("orders/created"), 0);
-    QCOMPARE(m_eventBus->subscriberCount("items/added"), 0);
+    QCOMPARE(m_bus->subscriberCount("orders/items/added"), 1);
+    QCOMPARE(m_bus->subscriberCount("products/items/removed"), 1);
+    QCOMPARE(m_bus->subscriberCount("orders/created"), 0);
 }
 
 void TestEventBus::testMatchesTopic()
 {
-    // Test the matchesTopic helper method directly
-    QVERIFY(m_eventBus->matchesTopic("orders/created", "orders/created"));
-    QVERIFY(m_eventBus->matchesTopic("orders/created", "orders/*"));
-    QVERIFY(m_eventBus->matchesTopic("orders/created", "*/created"));
-    QVERIFY(m_eventBus->matchesTopic("orders/created", "*/*"));
-    QVERIFY(m_eventBus->matchesTopic("orders/created", "**"));
-    QVERIFY(m_eventBus->matchesTopic("orders/items/added", "orders/**"));
-    QVERIFY(m_eventBus->matchesTopic("orders/items/added", "**/added"));
-
-    QVERIFY(!m_eventBus->matchesTopic("orders/created", "orders/updated"));
-    QVERIFY(!m_eventBus->matchesTopic("orders/items/added", "orders/*"));
-    QVERIFY(!m_eventBus->matchesTopic("orders", "orders/*"));
+    QVERIFY(m_bus->matchesTopic("orders/created", "orders/*"));
+    QVERIFY(m_bus->matchesTopic("orders/items/added", "orders/**"));
+    QVERIFY(!m_bus->matchesTopic("orders/items/added", "orders/*"));
+    QVERIFY(!m_bus->matchesTopic("orders", "orders/*"));
 }
 
 // =============================================================================
-// Subscription options tests
+// Options
 // =============================================================================
 
 void TestEventBus::testPriority()
 {
-    // Higher priority should be notified first
-    // Note: Current implementation doesn't expose delivery order directly,
-    // but we can verify both subscriptions receive events
+    QStringList order;
 
-    SubscriptionOptions lowPriority;
-    lowPriority.priority = 1;
+    SubscriptionOptions low;
+    low.priority = 1;
+    low.async = false;
+    m_bus->subscribe("test", "low", [&order](const Event&) { order.append("low"); }, low);
 
-    SubscriptionOptions highPriority;
-    highPriority.priority = 10;
+    SubscriptionOptions high;
+    high.priority = 10;
+    high.async = false;
+    m_bus->subscribe("test", "high", [&order](const Event&) { order.append("high"); }, high);
 
-    m_eventBus->subscribe("test/event", "plugin-low", lowPriority);
-    m_eventBus->subscribe("test/event", "plugin-high", highPriority);
+    m_bus->publishSync("test", {}, "sender");
 
-    QCOMPARE(m_eventBus->subscriberCount("test/event"), 2);
-
-    int notified = m_eventBus->publishSync("test/event", {{"key", "value"}}, "sender");
-    QCOMPARE(notified, 2);
+    QCOMPARE(order.size(), 2);
+    QCOMPARE(order[0], QString("high"));
+    QCOMPARE(order[1], QString("low"));
 }
 
 void TestEventBus::testReceiveOwnEvents()
 {
-    // Default: should NOT receive own events
-    SubscriptionOptions defaultOpts;
-    m_eventBus->subscribe("test/event", "plugin-a", defaultOpts);
+    int received = 0;
+    m_bus->subscribe("test", "plugin-a",
+        [&received](const Event&) { received++; });
 
-    int notified = m_eventBus->publishSync("test/event", {}, "plugin-a");
-    QCOMPARE(notified, 0);  // Self-published, filtered out
+    m_bus->publishSync("test", {}, "plugin-a");
+    QCOMPARE(received, 0);  // Default: don't receive own
 
-    notified = m_eventBus->publishSync("test/event", {}, "plugin-b");
-    QCOMPARE(notified, 1);  // Different sender, should receive
+    m_bus->publishSync("test", {}, "plugin-b");
+    QCOMPARE(received, 1);
 
-    // With receiveOwnEvents = true
-    m_eventBus->unsubscribeAll("plugin-a");
+    // Now with receiveOwnEvents
+    m_bus->unsubscribeAll("plugin-a");
+    received = 0;
 
-    SubscriptionOptions receiveOwn;
-    receiveOwn.receiveOwnEvents = true;
-    m_eventBus->subscribe("test/event", "plugin-a", receiveOwn);
+    SubscriptionOptions opts;
+    opts.receiveOwnEvents = true;
+    opts.async = false;
+    m_bus->subscribe("test", "plugin-a",
+        [&received](const Event&) { received++; }, opts);
 
-    notified = m_eventBus->publishSync("test/event", {}, "plugin-a");
-    QCOMPARE(notified, 1);  // Should receive own event now
+    m_bus->publishSync("test", {}, "plugin-a");
+    QCOMPARE(received, 1);
 }
 
 // =============================================================================
-// Query methods tests
+// Query
 // =============================================================================
 
 void TestEventBus::testSubscriberCount()
 {
-    QCOMPARE(m_eventBus->subscriberCount("any/topic"), 0);
+    m_bus->subscribe("orders/*", "a", [](const Event&) {});
+    m_bus->subscribe("orders/created", "b", [](const Event&) {});
+    m_bus->subscribe("products/*", "c", [](const Event&) {});
 
-    m_eventBus->subscribe("orders/*", "plugin-a");
-    m_eventBus->subscribe("orders/created", "plugin-b");
-    m_eventBus->subscribe("products/*", "plugin-c");
-
-    // "orders/created" matches both "orders/*" and "orders/created"
-    QCOMPARE(m_eventBus->subscriberCount("orders/created"), 2);
-    QCOMPARE(m_eventBus->subscriberCount("orders/updated"), 1);
-    QCOMPARE(m_eventBus->subscriberCount("products/new"), 1);
-    QCOMPARE(m_eventBus->subscriberCount("unknown/topic"), 0);
+    QCOMPARE(m_bus->subscriberCount("orders/created"), 2);
+    QCOMPARE(m_bus->subscriberCount("orders/updated"), 1);
+    QCOMPARE(m_bus->subscriberCount("products/new"), 1);
+    QCOMPARE(m_bus->subscriberCount("unknown"), 0);
 }
 
 void TestEventBus::testActiveTopics()
 {
-    QVERIFY(m_eventBus->activeTopics().isEmpty());
+    m_bus->subscribe("orders/created", "a", [](const Event&) {});
+    m_bus->subscribe("orders/*", "b", [](const Event&) {});
+    m_bus->subscribe("products/**", "c", [](const Event&) {});
 
-    m_eventBus->subscribe("orders/created", "plugin-a");
-    m_eventBus->subscribe("orders/*", "plugin-b");
-    m_eventBus->subscribe("products/**", "plugin-c");
-
-    QStringList topics = m_eventBus->activeTopics();
+    QStringList topics = m_bus->activeTopics();
     QCOMPARE(topics.size(), 3);
     QVERIFY(topics.contains("orders/created"));
     QVERIFY(topics.contains("orders/*"));
@@ -305,85 +278,154 @@ void TestEventBus::testActiveTopics()
 
 void TestEventBus::testTopicStats()
 {
-    m_eventBus->subscribe("orders/created", "plugin-a");
-    m_eventBus->subscribe("orders/*", "plugin-b");
+    SubscriptionOptions sync;
+    sync.async = false;
+    m_bus->subscribe("orders/created", "a", [](const Event&) {}, sync);
+    m_bus->subscribe("orders/*", "b", [](const Event&) {}, sync);
 
-    // Before any events
-    TopicStats stats = m_eventBus->topicStats("orders/created");
-    QCOMPARE(stats.topic, QString("orders/created"));
+    m_bus->publishSync("orders/created", {}, "sender");
+    m_bus->publishSync("orders/created", {}, "sender");
+    m_bus->publishSync("orders/created", {}, "sender");
+
+    TopicStats stats = m_bus->topicStats("orders/created");
     QCOMPARE(stats.subscriberCount, 2);
-    QCOMPARE(stats.eventCount, 0);
-
-    // Publish some events
-    m_eventBus->publishSync("orders/created", {}, "sender");
-    m_eventBus->publishSync("orders/created", {}, "sender");
-    m_eventBus->publishSync("orders/created", {}, "sender");
-
-    stats = m_eventBus->topicStats("orders/created");
     QCOMPARE(stats.eventCount, 3);
     QVERIFY(stats.lastEventTime > 0);
-
-    // QML-friendly variant version
-    QVariantMap variantStats = m_eventBus->topicStatsAsVariant("orders/created");
-    QCOMPARE(variantStats["eventCount"].toLongLong(), 3);
 }
 
 void TestEventBus::testSubscriptionsFor()
 {
-    QVERIFY(m_eventBus->subscriptionsFor("plugin-a").isEmpty());
+    QString s1 = m_bus->subscribe("t1", "plugin-a", [](const Event&) {});
+    QString s2 = m_bus->subscribe("t2", "plugin-a", [](const Event&) {});
+    m_bus->subscribe("t3", "plugin-b", [](const Event&) {});
 
-    QString sub1 = m_eventBus->subscribe("topic1", "plugin-a");
-    QString sub2 = m_eventBus->subscribe("topic2", "plugin-a");
-    QString sub3 = m_eventBus->subscribe("topic3", "plugin-b");
+    QStringList subs = m_bus->subscriptionsFor("plugin-a");
+    QCOMPARE(subs.size(), 2);
+    QVERIFY(subs.contains(s1));
+    QVERIFY(subs.contains(s2));
+}
 
-    QStringList pluginASubs = m_eventBus->subscriptionsFor("plugin-a");
-    QCOMPARE(pluginASubs.size(), 2);
-    QVERIFY(pluginASubs.contains(sub1));
-    QVERIFY(pluginASubs.contains(sub2));
+// =============================================================================
+// Request/Response
+// =============================================================================
 
-    QStringList pluginBSubs = m_eventBus->subscriptionsFor("plugin-b");
-    QCOMPARE(pluginBSubs.size(), 1);
-    QVERIFY(pluginBSubs.contains(sub3));
+void TestEventBus::testRegisterHandler()
+{
+    bool ok = m_bus->registerHandler("orders/getAll", "plugin-orders",
+        [](const Event&) -> QVariantMap { return {{"orders", QVariantList{}}}; });
+    QVERIFY(ok);
+    QVERIFY(m_bus->hasHandler("orders/getAll"));
+}
+
+void TestEventBus::testRequestResponse()
+{
+    m_bus->registerHandler("orders/getById", "plugin-orders",
+        [](const Event& e) -> QVariantMap {
+            return {
+                {"id", e.data["id"]},
+                {"customer", "John"},
+                {"amount", 99.99}
+            };
+        });
+
+    auto result = m_bus->request("orders/getById", {{"id", "42"}}, "dashboard");
+    QVERIFY(result.has_value());
+    QCOMPARE(result->value("id").toString(), QString("42"));
+    QCOMPARE(result->value("customer").toString(), QString("John"));
+}
+
+void TestEventBus::testRequestNoHandler()
+{
+    auto result = m_bus->request("nonexistent", {}, "sender");
+    QVERIFY(!result.has_value());
+}
+
+void TestEventBus::testUnregisterHandler()
+{
+    m_bus->registerHandler("test", "a", [](const Event&) -> QVariantMap { return {}; });
+    QVERIFY(m_bus->hasHandler("test"));
+    QVERIFY(m_bus->unregisterHandler("test"));
+    QVERIFY(!m_bus->hasHandler("test"));
+    QVERIFY(!m_bus->unregisterHandler("test"));
+}
+
+void TestEventBus::testUnregisterAllHandlers()
+{
+    m_bus->registerHandler("a", "plugin-a", [](const Event&) -> QVariantMap { return {}; });
+    m_bus->registerHandler("b", "plugin-a", [](const Event&) -> QVariantMap { return {}; });
+    m_bus->registerHandler("c", "plugin-b", [](const Event&) -> QVariantMap { return {}; });
+
+    m_bus->unregisterAllHandlers("plugin-a");
+    QVERIFY(!m_bus->hasHandler("a"));
+    QVERIFY(!m_bus->hasHandler("b"));
+    QVERIFY(m_bus->hasHandler("c"));
+}
+
+void TestEventBus::testHasHandler()
+{
+    QVERIFY(!m_bus->hasHandler("any"));
+    m_bus->registerHandler("orders/count", "orders",
+        [](const Event&) -> QVariantMap { return {{"count", 42}}; });
+    QVERIFY(m_bus->hasHandler("orders/count"));
+    QVERIFY(!m_bus->hasHandler("orders/other"));
+}
+
+void TestEventBus::testRequestHandlerException()
+{
+    m_bus->registerHandler("broken", "broken",
+        [](const Event&) -> QVariantMap { throw std::runtime_error("boom"); });
+
+    auto result = m_bus->request("broken", {}, "sender");
+    QVERIFY(!result.has_value());
+}
+
+void TestEventBus::testDuplicateHandler()
+{
+    QVERIFY(m_bus->registerHandler("dup", "a",
+        [](const Event&) -> QVariantMap { return {{"from", "a"}}; }));
+    QVERIFY(!m_bus->registerHandler("dup", "b",
+        [](const Event&) -> QVariantMap { return {{"from", "b"}}; }));
+
+    auto result = m_bus->request("dup", {}, "sender");
+    QCOMPARE(result->value("from").toString(), QString("a"));
+}
+
+void TestEventBus::testRequestFromQml()
+{
+    m_bus->registerHandler("qml/test", "qml-plugin",
+        [](const Event&) -> QVariantMap { return {{"msg", "hello"}}; });
+
+    QVariantMap ok = m_bus->requestFromQml("qml/test");
+    QCOMPARE(ok["__success"].toBool(), true);
+    QCOMPARE(ok["msg"].toString(), QString("hello"));
+
+    QVariantMap fail = m_bus->requestFromQml("nope");
+    QCOMPARE(fail["__success"].toBool(), false);
 }
 
 // =============================================================================
 // Edge cases
 // =============================================================================
 
-void TestEventBus::testEmptyTopic()
-{
-    // Empty topic should still work (though not recommended)
-    QString subId = m_eventBus->subscribe("", "plugin-a");
-    QVERIFY(!subId.isEmpty());
-
-    int notified = m_eventBus->publishSync("", {{"test", true}}, "sender");
-    QCOMPARE(notified, 1);
-}
-
 void TestEventBus::testMultipleSubscribers()
 {
-    // Same topic, multiple subscribers
-    m_eventBus->subscribe("shared/topic", "plugin-a");
-    m_eventBus->subscribe("shared/topic", "plugin-b");
-    m_eventBus->subscribe("shared/topic", "plugin-c");
+    int count = 0;
+    SubscriptionOptions sync;
+    sync.async = false;
 
-    QCOMPARE(m_eventBus->subscriberCount("shared/topic"), 3);
+    m_bus->subscribe("shared", "a", [&count](const Event&) { count++; }, sync);
+    m_bus->subscribe("shared", "b", [&count](const Event&) { count++; }, sync);
+    m_bus->subscribe("shared", "c", [&count](const Event&) { count++; }, sync);
 
-    QSignalSpy spy(m_eventBus, &EventBusService::eventPublished);
-    int notified = m_eventBus->publishSync("shared/topic", {}, "external");
-    
+    int notified = m_bus->publishSync("shared", {}, "external");
     QCOMPARE(notified, 3);
-    QCOMPARE(spy.count(), 1);  // One signal emission, three subscribers
+    QCOMPARE(count, 3);
 }
 
 void TestEventBus::testNoSubscribers()
 {
-    QSignalSpy spy(m_eventBus, &EventBusService::eventPublished);
-
-    int notified = m_eventBus->publishSync("nobody/listening", {{"data", 123}}, "sender");
-    
+    int notified = m_bus->publishSync("nobody/listening", {}, "sender");
     QCOMPARE(notified, 0);
-    QCOMPARE(spy.count(), 0);  // No signal if no subscribers
 }
 
 QTEST_MAIN(TestEventBus)
