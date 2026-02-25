@@ -258,6 +258,20 @@ void Application::setupPaths()
         }
     }
 
+    // Publish extra QML paths to QML_IMPORT_PATH env var so plugins can discover
+    // their QML files from it (plugins read this env var for filesystem QML lookup)
+    if (!m_extraQmlPaths.isEmpty()) {
+        QString existing = qEnvironmentVariable("QML_IMPORT_PATH");
+        QStringList allQmlPaths = m_extraQmlPaths;
+        if (!existing.isEmpty()) {
+            for (const QString& p : existing.split(QDir::listSeparator(), Qt::SkipEmptyParts)) {
+                if (!allQmlPaths.contains(p))
+                    allQmlPaths.append(p);
+            }
+        }
+        qputenv("QML_IMPORT_PATH", allQmlPaths.join(QDir::listSeparator()).toLocal8Bit());
+    }
+
     qDebug() << "Plugin path:" << m_pluginPath;
     qDebug() << "QML path:" << m_qmlPath;
     qDebug() << "Config path:" << m_configPath;
