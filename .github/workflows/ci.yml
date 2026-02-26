@@ -37,14 +37,14 @@ jobs:
           if [[ -n "${{ github.event.inputs.sdk_version }}" ]]; then
             SDK_VERSION="${{ github.event.inputs.sdk_version }}"
           else
-            SDK_VERSION=$(gh release view -R dyzdyz010/mpf-sdk --json tagName -q '.tagName')
+            SDK_VERSION=$(gh release view -R QMPF/mpf-sdk --json tagName -q '.tagName')
           fi
           echo "sdk_version=$SDK_VERSION" >> $GITHUB_OUTPUT
           
           if [[ -n "${{ github.event.inputs.ui_components_version }}" ]]; then
             UI_VERSION="${{ github.event.inputs.ui_components_version }}"
           else
-            UI_VERSION=$(gh release view -R dyzdyz010/mpf-ui-components --json tagName -q '.tagName')
+            UI_VERSION=$(gh release view -R QMPF/mpf-ui-components --json tagName -q '.tagName')
           fi
           echo "ui_components_version=$UI_VERSION" >> $GITHUB_OUTPUT
           
@@ -98,7 +98,7 @@ jobs:
           
           mkdir -p deps/mpf-sdk && cd deps/mpf-sdk
           gh release download ${{ needs.resolve-versions.outputs.sdk_version }} \
-            -R dyzdyz010/mpf-sdk \
+            -R QMPF/mpf-sdk \
             -p "mpf-sdk-${{ matrix.artifact_suffix }}.${{ matrix.ext }}"
           [[ "${{ matrix.ext }}" == "tar.gz" ]] && tar -xzf *.tar.gz || 7z x *.zip
           rm -f *.${{ matrix.ext }}
@@ -106,7 +106,7 @@ jobs:
           
           mkdir -p deps/mpf-ui-components && cd deps/mpf-ui-components
           gh release download ${{ needs.resolve-versions.outputs.ui_components_version }} \
-            -R dyzdyz010/mpf-ui-components \
+            -R QMPF/mpf-ui-components \
             -p "mpf-ui-components-${{ matrix.artifact_suffix }}.${{ matrix.ext }}"
           [[ "${{ matrix.ext }}" == "tar.gz" ]] && tar -xzf *.tar.gz || 7z x *.zip
           rm -f *.${{ matrix.ext }}
@@ -215,6 +215,6 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME}"
           echo "Triggering mpf-release (host $VERSION completed)"
-          gh workflow run release.yml -R dyzdyz010/mpf-release
+          gh workflow run release.yml -R QMPF/mpf-release
         env:
           GH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
