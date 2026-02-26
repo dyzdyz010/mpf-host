@@ -40,7 +40,7 @@ ApplicationWindow {
         // Separator
         Rectangle {
             Layout.fillHeight: true
-            width: 10
+            width: 1
             color: Theme ? Qt.darker(Theme.surfaceColor, 1.1) : "#E0E0E0"
         }
 
@@ -145,7 +145,6 @@ ApplicationWindow {
                 onStatusChanged: {
                     if (status === Loader.Error) {
                         console.error("Failed to load page:", source)
-                        console.error("Error:", contentLoader.sourceComponent)
                     }
                 }
             }
@@ -162,11 +161,12 @@ ApplicationWindow {
         }
 
         ScrollView {
+            id: welcomeScroll
             anchors.fill: parent
             anchors.margins: 24
 
             ColumnLayout {
-                width: parent.parent.width - 48
+                width: welcomeScroll.availableWidth
                 spacing: 24
 
                 // Hero section
@@ -420,18 +420,4 @@ ApplicationWindow {
         sourceComponent: ErrorDialog {}
     }
 
-    // DEBUG: Auto-load orders page on startup to trigger crash
-    Component.onCompleted: {
-        console.log("DEBUG: Auto-loading orders page for crash testing...")
-        Qt.callLater(function() {
-            if (Navigation) {
-                var pageUrl = Navigation.getPageUrl("orders")
-                if (pageUrl) {
-                    console.log("DEBUG: Loading orders page:", pageUrl)
-                    contentLoader.loadPage(pageUrl)
-                    root.currentRoute = "orders"
-                }
-            }
-        })
-    }
 }

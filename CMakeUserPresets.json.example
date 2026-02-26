@@ -8,9 +8,9 @@
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.3/mingw_64;C:/Users/YOUR_USERNAME/.mpf-sdk/current",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.3/mingw_64;C:/Users/dyz/.mpf-sdk/current",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "QML_IMPORT_PATH": "C:/Users/YOUR_USERNAME/.mpf-sdk/current/qml;C:/Qt/6.8.3/mingw_64/qml"
+        "QML_IMPORT_PATH": "C:/Users/dyz/.mpf-sdk/current/qml;C:/Qt/6.8.3/mingw_64/qml"
       }
     },
     {
@@ -20,9 +20,9 @@
       "binaryDir": "${sourceDir}/build-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.3/mingw_64;C:/Users/YOUR_USERNAME/.mpf-sdk/current",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.8.3/mingw_64;C:/Users/dyz/.mpf-sdk/current",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "QML_IMPORT_PATH": "C:/Users/YOUR_USERNAME/.mpf-sdk/current/qml;C:/Qt/6.8.3/mingw_64/qml"
+        "QML_IMPORT_PATH": "C:/Users/dyz/.mpf-sdk/current/qml;C:/Qt/6.8.3/mingw_64/qml"
       }
     }
   ],
