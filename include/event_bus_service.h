@@ -37,11 +37,11 @@ public:
                                 const QVariantMap& data,
                                 const QString& senderId = {}) override;
 
-    // IEventBus interface - Subscribing
-    Q_INVOKABLE QString subscribe(const QString& pattern,
-                                  const QString& subscriberId,
-                                  EventHandler handler,
-                                  const SubscriptionOptions& options = {}) override;
+    // IEventBus interface - Subscribing (C++ only, not exposed to QML due to std::function)
+    QString subscribe(const QString& pattern,
+                      const QString& subscriberId,
+                      EventHandler handler,
+                      const SubscriptionOptions& options = {}) override;
 
     Q_INVOKABLE bool unsubscribe(const QString& subscriptionId) override;
     Q_INVOKABLE void unsubscribeAll(const QString& subscriberId) override;
