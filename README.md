@@ -110,6 +110,10 @@ cmake --build build
 ./build/test_plugin_dependencies    # 插件依赖测试
 ```
 
+## 文档
+
+> 📖 **[MPF 开发环境完整教程](https://github.com/QMPF/mpf-dev/blob/main/docs/USAGE.md)** — 安装指南、命令参考、开发流程、IDE 配置、常见问题
+
 ## 许可证
 
 MIT License
