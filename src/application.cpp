@@ -367,11 +367,11 @@ void Application::loadPlugins()
     qDebug() << "Total discovered" << count << "plugins";
     
     // Load, initialize, and start
-    if (m_pluginManager->loadAll()) {
-        if (m_pluginManager->initializeAll()) {
-            m_pluginManager->startAll();
-        }
-    }
+    // Note: each phase continues even if some plugins fail,
+    // so that working plugins are not blocked by a broken one.
+    m_pluginManager->loadAll();
+    m_pluginManager->initializeAll();
+    m_pluginManager->startAll();
     
     // Register plugin QML modules
     for (const QString& uri : m_pluginManager->qmlModuleUris()) {
