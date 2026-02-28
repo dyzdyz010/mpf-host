@@ -146,7 +146,8 @@ void Application::setupPaths()
         m_pluginPath = QDir(sdkRoot).filePath("plugins");
         m_configPath = QDir(sdkRoot).filePath("config");
 
-        // QML path resolution priority:
+        // QML import path resolution priority (used for qmldir discovery,
+        // actual QML files are loaded from qrc via 'prefer' directive):
         // 1. MPF_QML_PATH env var (set by mpf-dev run when host is linked)
         // 2. Local build QML (appDir/../qml, for Qt Creator debugging)
         // 3. SDK QML (fallback)
@@ -258,8 +259,9 @@ void Application::setupPaths()
         }
     }
 
-    // Publish extra QML paths to QML_IMPORT_PATH env var so plugins can discover
-    // their QML files from it (plugins read this env var for filesystem QML lookup)
+    // Publish extra QML paths to QML_IMPORT_PATH env var for:
+    // 1. QML engine import resolution (qmldir discovery → prefer directive → qrc loading)
+    // 2. Qt Creator IDE code completion
     if (!m_extraQmlPaths.isEmpty()) {
         QString existing = qEnvironmentVariable("QML_IMPORT_PATH");
         QStringList allQmlPaths = m_extraQmlPaths;
@@ -389,17 +391,9 @@ bool Application::loadMainQml()
         }
     }
     
-    // Fall back to host's Main.qml
+    // Fall back to host's Main.qml (always from embedded qrc resource)
     if (entryQml.isEmpty()) {
-        // Try filesystem path first (development), then qrc (release)
-        // Note: QT_RESOURCE_ALIAS flattens paths, so no /qml/ subdirectory
-        QString fsPath = m_qmlPath + "/MPF/Host/Main.qml";
-        if (QFile::exists(fsPath)) {
-            entryQml = QUrl::fromLocalFile(fsPath).toString();
-        } else {
-            // RESOURCE_PREFIX "/" + QT_RESOURCE_ALIAS means qrc:/MPF/Host/Main.qml
-            entryQml = "qrc:/MPF/Host/Main.qml";
-        }
+        entryQml = "qrc:/MPF/Host/Main.qml";
     }
     
     qDebug() << "Loading main QML:" << entryQml;

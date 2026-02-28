@@ -184,16 +184,12 @@ void example_qml_module_integration()
     //           ├── OrderCard.qml
     //           └── CreateOrderDialog.qml
     //
-    // Host 通过 addImportPath() 让 QML 引擎能找到这些文件：
+    // Host 通过 addImportPath() 让 QML 引擎能解析 import 语句：
     //
-    // m_engine->addImportPath(m_qmlPath);          // 主 QML 路径
-    // for (const auto& path : m_extraQmlPaths) {
-    //     m_engine->addImportPath(path);            // 额外路径（开发覆盖）
-    // }
+    // m_engine->addImportPath(m_qmlPath);          // 主 QML 路径（IDE 补全）
+    // m_engine->addImportPath("qrc:/");            // qrc 资源（运行时加载）
     //
-    // 插件在 registerRoutes() 中查找自己的 QML 文件：
-    // 搜索顺序：QML_IMPORT_PATH → MPF_SDK_ROOT/qml → app/../qml → app/qml
-    //
-    // 找到后，用 INavigation::registerRoute() 注册 URL：
-    // nav->registerRoute("orders", QUrl::fromLocalFile(qmlFile).toString());
+    // 插件的 QML 文件由 qt_add_qml_module 嵌入 DLL 的 qrc 资源中，
+    // 在 registerRoutes() 中直接使用 qrc URL 注册路由：
+    // nav->registerRoute("orders", "qrc:/YourCo/Orders/OrdersPage.qml");
 }
